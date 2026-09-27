@@ -22,12 +22,23 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(graph.neighbors("A"), (("B", 2.0),))
 
     def test_invalid_weight(self):
-        for weight in (float("nan"), float("inf"), True):
+        for weight in (float("nan"), float("inf"), True, 10**1000):
             with self.subTest(weight=weight), self.assertRaises(ValueError):
                 Graph().add_edge("A", "B", weight)
 
 
 class AlgorithmTests(unittest.TestCase):
+    def test_empty_graph_and_isolated_start(self):
+        for algorithm in (bfs, dfs, dijkstra):
+            with self.subTest(algorithm=algorithm.__name__):
+                with self.assertRaisesRegex(ValueError, "unknown node"):
+                    algorithm(Graph(), "A")
+                graph = Graph()
+                graph.add_node("A")
+                run = algorithm(graph, "A")
+                self.assertEqual(run.order, ("A",))
+                self.assertEqual(run.events[-1].kind, "finish")
+
     def test_bfs_order_and_hops(self):
         run = bfs(sample_graph(), "A")
         self.assertEqual(run.order, ("A", "B", "C", "D"))
@@ -50,6 +61,13 @@ class AlgorithmTests(unittest.TestCase):
         graph = sample_graph()
         graph.add_edge("isolated", "X", -1)
         with self.assertRaisesRegex(ValueError, "nonnegative"):
+            dijkstra(graph, "A")
+
+    def test_dijkstra_rejects_distance_overflow(self):
+        graph = Graph(directed=True)
+        graph.add_edge("A", "B", 1e308)
+        graph.add_edge("B", "C", 1e308)
+        with self.assertRaisesRegex(ValueError, "finite numeric range"):
             dijkstra(graph, "A")
 
     def test_unknown_start(self):
@@ -84,6 +102,9 @@ class UiFoundationTests(unittest.TestCase):
             parse_graph("A B\nC D nope")
         with self.assertRaisesRegex(ValueError, "at least one edge"):
             parse_graph("# only a comment")
+        for text in ("A B nan", "A B inf", "A B 1e999", "A B 1 2"):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, "line 1"):
+                parse_graph(text)
 
     def test_playback_steps_pauses_by_not_advancing_and_resets(self):
         playback = Playback(bfs(sample_graph(), "A"))
@@ -101,6 +122,14 @@ class UiFoundationTests(unittest.TestCase):
         self.assertIs(playback.step(), final)
         playback.reset()
         self.assertEqual(playback.index, -1)
+        self.assertIsNone(playback.current)
+
+    def test_empty_playback_is_safe(self):
+        from graph_steps import AlgorithmRun
+        playback = Playback(AlgorithmRun("bfs", "A", (), {}, {}, ()))
+        self.assertTrue(playback.finished)
+        self.assertIsNone(playback.step())
+        playback.reset()
         self.assertIsNone(playback.current)
 
 

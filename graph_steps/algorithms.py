@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterator
+import math
 
 from .events import AlgorithmRun, EventKind, StepEvent
 from .graph import Graph
@@ -114,6 +115,8 @@ def dijkstra(graph: Graph, start: str) -> AlgorithmRun:
             if neighbor in settled:
                 continue
             candidate = run.distances[current] + weight
+            if not math.isfinite(candidate):
+                raise ValueError("shortest-path distance exceeds finite numeric range")
             if neighbor not in run.distances or candidate < run.distances[neighbor]:
                 run.distances[neighbor] = candidate
                 run.predecessor[neighbor] = current

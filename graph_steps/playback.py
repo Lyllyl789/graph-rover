@@ -14,13 +14,13 @@ class Playback:
 
     @property
     def current(self) -> StepEvent | None:
-        if self.index < 0:
+        if self.index < 0 or not self.run.events:
             return None
         return self.run.events[self.index]
 
     @property
     def finished(self) -> bool:
-        return self.index >= len(self.run.events) - 1
+        return not self.run.events or self.index >= len(self.run.events) - 1
 
     def step(self) -> StepEvent | None:
         if self.finished:

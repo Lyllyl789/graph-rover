@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 
 from graph_steps import Playback, bfs, dfs, dijkstra, parse_graph
 
@@ -27,6 +28,13 @@ class GraphVisualizer(tk.Tk):
         self.after_id: str | None = None
         self._build()
         self._load_sample("Weighted directed")
+        self.editor.edit_modified(False)
+        self.editor.bind("<<Modified>>", self._editor_changed)
+        for variable in (self.directed, self.algorithm, self.start):
+            variable.trace_add("write", self._inputs_changed)
+        self.bind("<Control-Return>", lambda _event: self._run())
+        self.bind("<Control-Right>", lambda _event: self._step())
+        self.bind("<Control-r>", lambda _event: self._reset())
 
     def _build(self) -> None:
         style = ttk.Style(self)
@@ -104,16 +112,31 @@ class GraphVisualizer(tk.Tk):
         ttk.Scale(controls, from_=150, to=1500, variable=self.speed, orient="horizontal", length=130).pack(side="left")
 
     def _load_sample(self, name: str) -> None:
+        self._clear_run()
         self.editor.delete("1.0", "end")
         self.editor.insert("1.0", SAMPLES[name])
         self.directed.set(name == "Weighted directed")
+        self.status.set("Sample loaded · build a graph to begin")
+        self.error.set("")
+
+    def _editor_changed(self, _event) -> None:
+        if self.editor.edit_modified():
+            self.editor.edit_modified(False)
+            self._inputs_changed()
+
+    def _inputs_changed(self, *_args) -> None:
+        self._clear_run()
+        self.error.set("")
+        self.status.set("Inputs changed · build a graph to begin")
 
     def _run(self) -> None:
         self._stop_timer()
+        self.play_button.configure(text="▶ Play")
         try:
             graph = parse_graph(self.editor.get("1.0", "end"), self.directed.get())
             run = ALGORITHMS[self.algorithm.get()](graph, self.start.get().strip())
         except (ValueError, KeyError) as exc:
+            self._clear_run()
             self.error.set(str(exc))
             self.status.set("Could not build the run. Fix the input and try again.")
             return
@@ -126,6 +149,11 @@ class GraphVisualizer(tk.Tk):
         self._update_node_status(None)
 
     def _step(self) -> None:
+        self._stop_timer()
+        self.play_button.configure(text="▶ Play")
+        self._advance()
+
+    def _advance(self) -> None:
         if not self.playback:
             return
         event = self.playback.step()
@@ -143,6 +171,8 @@ class GraphVisualizer(tk.Tk):
         elif self.playback.finished:
             self.playback.reset()
             self._draw()
+            self._update_node_status(None)
+            self.status.set("Restarted · waiting for first step")
             self.play_button.configure(text="⏸ Pause")
             self._schedule_step()
         else:
@@ -157,7 +187,7 @@ class GraphVisualizer(tk.Tk):
         self.after_id = None
         if not self.playback:
             return
-        self._step()
+        self._advance()
         if not self.playback.finished:
             self._schedule_step()
 
@@ -165,6 +195,14 @@ class GraphVisualizer(tk.Tk):
         if self.after_id is not None:
             self.after_cancel(self.after_id)
             self.after_id = None
+
+    def _clear_run(self) -> None:
+        self._stop_timer()
+        self.graph = None
+        self.playback = None
+        self.play_button.configure(text="▶ Play", state="disabled")
+        self.canvas.delete("all")
+        self.node_status.set("Build a graph to begin.")
 
     def _reset(self) -> None:
         self._stop_timer()
@@ -203,14 +241,16 @@ class GraphVisualizer(tk.Tk):
     def _draw(self, event=None) -> None:
         if not self.graph:
             return
+        if event is None and self.playback:
+            event = self.playback.current
         canvas = self.canvas
         canvas.delete("all")
         nodes = self.graph.nodes
         width, height = max(canvas.winfo_width(), 320), max(canvas.winfo_height(), 250)
         cx, cy = width / 2, height / 2
         radius = max(55, min(width, height) * 0.34)
-        points = {node: (cx + radius * __import__("math").cos(-__import__("math").pi / 2 + 2 * __import__("math").pi * i / len(nodes)),
-                         cy + radius * __import__("math").sin(-__import__("math").pi / 2 + 2 * __import__("math").pi * i / len(nodes)))
+        points = {node: (cx + radius * math.cos(-math.pi / 2 + 2 * math.pi * i / len(nodes)),
+                         cy + radius * math.sin(-math.pi / 2 + 2 * math.pi * i / len(nodes)))
                   for i, node in enumerate(nodes)}
         drawn = set()
         for source, target, weight in self.graph.edges():
@@ -241,4 +281,4 @@ if __name__ == "__main__":
     try:
         GraphVisualizer().mainloop()
     except tk.TclError as exc:
-        messagebox.showerror("Could not start UI", str(exc))
+        raise SystemExit(f"Could not start UI: {exc}") from exc

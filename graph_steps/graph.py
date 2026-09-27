@@ -16,13 +16,19 @@ class Graph:
         self._adjacency.setdefault(node, {})
 
     def add_edge(self, source: str, target: str, weight: float = 1.0) -> None:
-        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not math.isfinite(weight):
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)):
+            raise ValueError("edge weights must be finite numbers")
+        try:
+            weight = float(weight)
+        except OverflowError as exc:
+            raise ValueError("edge weights must be finite numbers") from exc
+        if not math.isfinite(weight):
             raise ValueError("edge weights must be finite numbers")
         self.add_node(source)
         self.add_node(target)
-        self._adjacency[source][target] = float(weight)
+        self._adjacency[source][target] = weight
         if not self.directed:
-            self._adjacency[target][source] = float(weight)
+            self._adjacency[target][source] = weight
 
     @property
     def nodes(self) -> tuple[str, ...]:
