@@ -1,11 +1,5 @@
 # Development note
 
-This local prototype was drafted by AI in the scheduled task. The AI chose a
-small Python standard-library implementation because no relevant algorithm
-visualization repository was present in the current task directory. It also
-enumerated and ran basic tests and documented the event schema. No human
-review, feedback, authorship, or final commit decision is claimed here.
+This phase extends the phase-one graph algorithm event prototype in this repository. AI assistance in this run added an edge-list parser, a UI-independent playback cursor, a Tkinter desktop interface, focused tests, and usage documentation. The interface calls the existing BFS, DFS, and Dijkstra functions and renders their event snapshots; algorithm implementations were not replaced.
 
-Before adopting this code in a repository, a human should confirm the target
-repository, preferred language and UI, event semantics, and whether the
-algorithm tie-break rules match the intended teaching material.
+No human review, feedback, authorship, or final sign-off is claimed in this note. Human follow-up: run the app on the intended desktop, inspect usability and graph rendering, and decide whether to retain or revise this implementation.

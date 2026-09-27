@@ -1,6 +1,6 @@
 import unittest
 
-from graph_steps import Graph, bfs, dfs, dijkstra
+from graph_steps import Graph, Playback, bfs, dfs, dijkstra, parse_graph
 
 
 def sample_graph():
@@ -68,6 +68,40 @@ class AlgorithmTests(unittest.TestCase):
                 self.assertEqual(run.events[0].visited, ())
                 self.assertEqual(run.events[-1].visited, run.order)
                 self.assertEqual(run.events[-1].distances, run.distances)
+
+
+class UiFoundationTests(unittest.TestCase):
+    def test_edge_list_parser_direction_and_default_weight(self):
+        directed = parse_graph("A B 2\nB C # default weight", directed=True)
+        self.assertEqual(directed.neighbors("A"), (("B", 2.0),))
+        self.assertEqual(directed.neighbors("B"), (("C", 1.0),))
+        self.assertEqual(directed.neighbors("C"), ())
+        undirected = parse_graph("A B", directed=False)
+        self.assertEqual(undirected.neighbors("B"), (("A", 1.0),))
+
+    def test_parser_reports_bad_line_and_empty_graph(self):
+        with self.assertRaisesRegex(ValueError, "line 2"):
+            parse_graph("A B\nC D nope")
+        with self.assertRaisesRegex(ValueError, "at least one edge"):
+            parse_graph("# only a comment")
+
+    def test_playback_steps_pauses_by_not_advancing_and_resets(self):
+        playback = Playback(bfs(sample_graph(), "A"))
+        self.assertIsNone(playback.current)
+        first = playback.step()
+        self.assertEqual(first.kind, "start")
+        self.assertEqual(playback.index, 0)
+        second = playback.step()
+        self.assertEqual(second.kind, "visit")
+        self.assertEqual(playback.index, 1)
+        while not playback.finished:
+            playback.step()
+        final = playback.current
+        self.assertEqual(final.kind, "finish")
+        self.assertIs(playback.step(), final)
+        playback.reset()
+        self.assertEqual(playback.index, -1)
+        self.assertIsNone(playback.current)
 
 
 if __name__ == "__main__":
